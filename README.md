@@ -1,4 +1,4 @@
-# KITHU Identity & Salary Platform
+# Tech Salary Transparency
 
 A minimalist, high-end platform for anonymous salary sharing, community verification, and statistical insights.
 
