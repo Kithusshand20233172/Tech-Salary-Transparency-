@@ -1,4 +1,4 @@
-# KITHU Identity & Salary Platform
+# Identity & Salary Platform
 
 A minimalist, high-end platform for anonymous salary sharing, community verification, and statistical insights.
 
