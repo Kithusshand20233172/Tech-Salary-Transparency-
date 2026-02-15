@@ -21,7 +21,8 @@ public class AuthController : ControllerBase
         try
         {
             var response = await _authService.RegisterAsync(request);
-            return Ok(response);
+            SetRefreshTokenCookie(response.RefreshToken);
+            return Ok(new { token = response.Token, email = response.Email });
         }
         catch (Exception ex)
         {
@@ -35,7 +36,29 @@ public class AuthController : ControllerBase
         try
         {
             var response = await _authService.LoginAsync(request);
-            return Ok(response);
+            SetRefreshTokenCookie(response.RefreshToken);
+            return Ok(new { token = response.Token, email = response.Email });
+        }
+        catch (Exception ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh()
+    {
+        try
+        {
+            var refreshToken = Request.Cookies["refreshToken"];
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return Unauthorized(new { message = "Refresh token not found" });
+            }
+
+            var response = await _authService.RefreshTokenAsync(refreshToken);
+            SetRefreshTokenCookie(response.RefreshToken);
+            return Ok(new { token = response.Token, email = response.Email });
         }
         catch (Exception ex)
         {
@@ -44,10 +67,35 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout()
     {
-        // For JWT, server doesn't need to do much unless we use blacklisting.
-        // Returning 200 OK tells the client it's safe to clear their local storage.
-        return Ok(new { message = "Logged out successfully" });
+        try
+        {
+            var refreshToken = Request.Cookies["refreshToken"];
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                await _authService.RevokeTokenAsync(refreshToken);
+            }
+            
+            Response.Cookies.Delete("refreshToken");
+            return Ok(new { message = "Logged out successfully" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private void SetRefreshTokenCookie(string refreshToken)
+    {
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = false, // Set to true in production with HTTPS
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTime.UtcNow.AddDays(7)
+        };
+        
+        Response.Cookies.Append("refreshToken", refreshToken, cookieOptions);
     }
 }

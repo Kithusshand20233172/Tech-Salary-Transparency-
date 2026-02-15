@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace IdentityService.Api.Services;
@@ -14,8 +13,6 @@ public interface IAuthService
 {
     Task<AuthResponse> RegisterAsync(RegisterRequest request);
     Task<AuthResponse> LoginAsync(LoginRequest request);
-    Task<AuthResponse> RefreshTokenAsync(string refreshToken);
-    Task RevokeTokenAsync(string refreshToken);
 }
 
 public class AuthService : IAuthService
@@ -45,7 +42,7 @@ public class AuthService : IAuthService
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        return await GenerateTokens(user);
+        return GenerateToken(user);
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -56,54 +53,14 @@ public class AuthService : IAuthService
             throw new Exception("Invalid credentials.");
         }
 
-        return await GenerateTokens(user);
+        return GenerateToken(user);
     }
 
-    public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
-    {
-        var storedToken = await _context.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
-
-        if (storedToken == null || !storedToken.IsActive)
-        {
-            throw new Exception("Invalid or expired refresh token.");
-        }
-
-        var user = await _context.Users.FindAsync(storedToken.UserId);
-        if (user == null)
-        {
-            throw new Exception("User not found.");
-        }
-
-        // Revoke the old refresh token (token rotation)
-        storedToken.RevokedAt = DateTime.UtcNow;
-        
-        // Generate new tokens
-        var newTokens = await GenerateTokens(user);
-        
-        await _context.SaveChangesAsync();
-        
-        return newTokens;
-    }
-
-    public async Task RevokeTokenAsync(string refreshToken)
-    {
-        var storedToken = await _context.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
-
-        if (storedToken != null && storedToken.IsActive)
-        {
-            storedToken.RevokedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-        }
-    }
-
-    private async Task<AuthResponse> GenerateTokens(User user)
+    private AuthResponse GenerateToken(User user)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var key = Encoding.ASCII.GetBytes(jwtSettings["SecretKey"]!);
 
-        // Generate Access Token
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -120,28 +77,6 @@ public class AuthService : IAuthService
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        var accessToken = tokenHandler.WriteToken(token);
-
-        // Generate Refresh Token
-        var refreshToken = new RefreshToken
-        {
-            Token = GenerateSecureToken(),
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(jwtSettings["RefreshTokenExpirationDays"] ?? "7")),
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _context.RefreshTokens.Add(refreshToken);
-        await _context.SaveChangesAsync();
-
-        return new AuthResponse(accessToken, refreshToken.Token, user.Email);
-    }
-
-    private static string GenerateSecureToken()
-    {
-        var randomBytes = new byte[64];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes);
+        return new AuthResponse(tokenHandler.WriteToken(token), user.Email);
     }
 }

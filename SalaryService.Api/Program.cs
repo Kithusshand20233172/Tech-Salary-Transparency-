@@ -8,12 +8,14 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.UseUrls("http://0.0.0.0:5001");
+
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "KITHU Identity Service", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "KITHU Salary Service", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme.",
@@ -62,10 +64,8 @@ builder.Services.AddAuthentication(x =>
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidateAudience = true,
-        ValidAudience = jwtSettings["Audience"]
+        ValidateIssuer = false,
+        ValidateAudience = false
     };
 });
 
@@ -97,6 +97,8 @@ using (var scope = app.Services.CreateScope())
     // Wait for DB to be ready in Docker
     try 
     {
+        // For shared DB in MVP, EnsureCreated only works if the DB is empty.
+        // We manually ensure ALL specific tables exist to avoid partial init issues.
         var sql = @"
             CREATE TABLE IF NOT EXISTS ""Users"" (
                 ""Id"" uuid NOT NULL CONSTRAINT ""PK_Users"" PRIMARY KEY,
@@ -105,31 +107,33 @@ using (var scope = app.Services.CreateScope())
                 ""Username"" text,
                 ""CreatedAt"" timestamp with time zone NOT NULL
             );
-            
-            -- Ensure Username is NULLABLE if it exists but has a constraint
+
+            -- Ensure Username is NULLABLE 
             ALTER TABLE ""Users"" ALTER COLUMN ""Username"" DROP NOT NULL;
 
             CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Users_Email"" ON ""Users"" (""Email"");
 
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Users_Email"" ON ""Users"" (""Email"");
-
-            CREATE TABLE IF NOT EXISTS ""RefreshTokens"" (
-                ""Id"" uuid NOT NULL CONSTRAINT ""PK_RefreshTokens"" PRIMARY KEY,
-                ""Token"" text NOT NULL,
-                ""UserId"" uuid NOT NULL,
-                ""ExpiresAt"" timestamp with time zone NOT NULL,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""RevokedAt"" timestamp with time zone
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_RefreshTokens_Token"" ON ""RefreshTokens"" (""Token"");
-            CREATE INDEX IF NOT EXISTS ""IX_RefreshTokens_UserId"" ON ""RefreshTokens"" (""UserId"");";
-        
+            CREATE TABLE IF NOT EXISTS ""SalarySubmissions"" (
+                ""Id"" uuid NOT NULL CONSTRAINT ""PK_SalarySubmissions"" PRIMARY KEY,
+                ""Country"" text NOT NULL,
+                ""Company"" text NOT NULL,
+                ""Role"" text NOT NULL,
+                ""ExperienceYears"" integer NOT NULL,
+                ""Level"" text NOT NULL,
+                ""SalaryAmount"" numeric NOT NULL,
+                ""Currency"" text NOT NULL,
+                ""Period"" text NOT NULL,
+                ""IsAnonymous"" boolean NOT NULL,
+                ""Status"" text NOT NULL,
+                ""UserEmail"" text,
+                ""SubmittedAt"" timestamp with time zone NOT NULL
+            );";
+            
         dbContext.Database.ExecuteSqlRaw(sql);
     }
     catch (Exception ex)
     {
-        // Log error or just retry manually
-        Console.WriteLine($"DB Connection failed: {ex.Message}");
+        Console.WriteLine($"DB Initialization failed: {ex.Message}");
     }
 }
 
@@ -138,8 +142,8 @@ app.MapControllers();
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     Console.WriteLine("\n----------------------------------------------------------------");
-    Console.WriteLine("   🚀 KITHU Identity Service is running!");
-    Console.WriteLine("   📄 Swagger UI: http://localhost:5000/swagger");
+    Console.WriteLine("   🚀 KITHU Salary Service is running!");
+    Console.WriteLine("   📄 Swagger UI: http://localhost:5001/swagger");
     Console.WriteLine("----------------------------------------------------------------\n");
 });
 

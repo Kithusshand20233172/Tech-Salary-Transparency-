@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
-import api from '@/lib/api';
+import { salaryApi } from '@/lib/api';
 import Link from 'next/link';
 
 export default function SalariesPage() {
@@ -15,7 +15,7 @@ export default function SalariesPage() {
     useEffect(() => {
         const fetchSalaries = async () => {
             try {
-                const response = await api.get('/salaries');
+                const response = await salaryApi.get('/salaries');
                 setSalaries(response.data);
             } catch (err: any) {
                 if (err.response?.status === 401) {

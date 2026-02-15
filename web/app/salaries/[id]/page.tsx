@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
-import api from '@/lib/api';
+import { salaryApi } from '@/lib/api';
 import { Toast } from '@/components/ui/Toast';
 import Link from 'next/link';
 
@@ -12,7 +12,6 @@ export default function SalaryDetailsPage() {
     const router = useRouter();
     const [salary, setSalary] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [voting, setVoting] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [error, setError] = useState('');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -22,7 +21,7 @@ export default function SalaryDetailsPage() {
         setIsLoggedIn(!!localStorage.getItem('token'));
         const fetchDetails = async () => {
             try {
-                const response = await api.get(`/salaries/${id}`);
+                const response = await salaryApi.get(`/salaries/${id}`);
                 setSalary(response.data);
             } catch (err) {
                 setError('Could not find salary details.');
@@ -33,31 +32,11 @@ export default function SalaryDetailsPage() {
         fetchDetails();
     }, [id]);
 
-    const handleVote = async (isUpvote: boolean) => {
-        if (!isLoggedIn) {
-            setToast('Please login to vote or report');
-            return;
-        }
-
-        setVoting(true);
-        try {
-            await api.post(`/salaries/${id}/vote`, { isUpvote });
-            // Refresh details to get new trust score
-            const response = await api.get(`/salaries/${id}`);
-            setSalary(response.data);
-            setToast(isUpvote ? 'Upvoted successfully' : 'Downvoted successfully');
-        } catch (err) {
-            setToast('Failed to record vote');
-        } finally {
-            setVoting(false);
-        }
-    };
-
     const handleStatusUpdate = async (newStatus: string) => {
         setUpdatingStatus(true);
         try {
-            await api.patch(`/salaries/${id}/status`, { status: newStatus });
-            const response = await api.get(`/salaries/${id}`);
+            await salaryApi.patch(`/salaries/${id}/status`, { status: newStatus });
+            const response = await salaryApi.get(`/salaries/${id}`);
             setSalary(response.data);
             setToast(`Status updated to ${newStatus}`);
         } catch (err) {
@@ -117,16 +96,6 @@ export default function SalaryDetailsPage() {
 
                     <div className="flex items-center space-x-6 p-6 bg-white border border-zinc-200 rounded-3xl shadow-sm">
                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Trust Score</p>
-                            <div className="flex items-center space-x-2">
-                                <span className={`text-2xl font-bold ${salary.trustScore >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {salary.trustScore > 0 ? `+${salary.trustScore}` : salary.trustScore}
-                                </span>
-                                <span className="text-xs text-zinc-400 font-medium">({salary.upvotes} UP / {salary.downvotes} DOWN)</span>
-                            </div>
-                        </div>
-                        <div className="h-10 w-px bg-zinc-100" />
-                        <div className="space-y-1">
                             <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Experience</p>
                             <p className="text-2xl font-bold">{salary.experienceYears}y <span className="text-sm text-zinc-400">{salary.level}</span></p>
                         </div>
@@ -146,39 +115,10 @@ export default function SalaryDetailsPage() {
 
                     <div className="bg-white border border-zinc-200 p-10 rounded-[40px] flex flex-col justify-center space-y-6">
                         <div className="space-y-2">
-                            <h3 className="font-bold text-lg">Help verify this data</h3>
-                            {!isLoggedIn && (
-                                <p className="text-sm text-amber-600 font-medium bg-amber-50 p-3 rounded-xl border border-amber-100 flex items-center">
-                                    <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    Login to vote or report
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex space-x-4">
-                            <Button
-                                onClick={() => handleVote(true)}
-                                variant="outline"
-                                className="flex-1 py-4 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
-                                isLoading={voting}
-                            >
-                                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-                                </svg>
-                                Upvote
-                            </Button>
-                            <Button
-                                onClick={() => handleVote(false)}
-                                variant="outline"
-                                className="flex-1 py-4 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
-                                isLoading={voting}
-                            >
-                                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                                </svg>
-                                Downvote
-                            </Button>
+                            <h3 className="font-bold text-lg">Verified Submission</h3>
+                            <p className="text-sm text-zinc-500 font-medium">
+                                This salary was submitted anonymously and is subject to community moderation.
+                            </p>
                         </div>
                     </div>
                 </section>

@@ -3,42 +3,31 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/Button';
-import api from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Toast } from '@/components/ui/Toast';
 
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, logout, isLoading } = useAuth();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/auth/login');
-    } else {
-      setIsAuthenticated(true);
-      if (searchParams.get('auth') === 'success') {
-        setToastMessage('Successfully logged in');
-        setShowToast(true);
-        window.history.replaceState({}, '', '/');
-      }
+    } else if (isAuthenticated && searchParams.get('auth') === 'success') {
+      setToastMessage('Successfully logged in');
+      setShowToast(true);
+      window.history.replaceState({}, '', '/');
     }
-  }, [router, searchParams]);
+  }, [isAuthenticated, isLoading, router, searchParams]);
 
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-      localStorage.removeItem('token');
-      router.push('/auth/login');
-    } catch (err) {
-      localStorage.removeItem('token');
-      router.push('/auth/login');
-    }
+    await logout();
   };
 
-  if (!isAuthenticated) return (
+  if (isLoading || !isAuthenticated) return (
     <div className="min-h-screen bg-white flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-zinc-200 border-t-black rounded-full animate-spin" />
     </div>

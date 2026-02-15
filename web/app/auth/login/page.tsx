@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import { authApi } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 
 export default function LoginPage() {
     const router = useRouter();
+    const { login } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -20,10 +22,14 @@ export default function LoginPage() {
         setError('');
 
         try {
-            const response = await api.post('/auth/login', { email, password });
-            const { token } = response.data;
-            localStorage.setItem('token', token);
-            router.push('/?auth=success');
+            const response = await authApi.post('/auth/login', { email, password });
+            const { token, email: userEmail } = response.data;
+
+            // Sync token with API client
+            const { setAccessToken } = await import('@/lib/api');
+            setAccessToken(token);
+
+            login(token, { email: userEmail });
         } catch (err: any) {
             setError(err.response?.data?.message || 'Invalid credentials.');
         } finally {

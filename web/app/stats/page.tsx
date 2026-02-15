@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import api from '@/lib/api';
+import { salaryApi } from '@/lib/api';
 import Link from 'next/link';
 
 export default function StatsPage() {
@@ -25,7 +25,7 @@ export default function StatsPage() {
             if (filters.role) params.append('role', filters.role);
             if (filters.level) params.append('level', filters.level);
 
-            const response = await api.get(`/salaries/stats?${params.toString()}`);
+            const response = await salaryApi.get(`/salaries/stats?${params.toString()}`);
             setStats(response.data);
         } catch (err) {
             console.error('Failed to fetch stats');
